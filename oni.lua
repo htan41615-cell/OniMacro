@@ -156,33 +156,6 @@ pcall(function()
             if dragT then dragT = false saveSettings(Main, ClickZoneBox, Tgl) end
         end
     end)
-
-    -- Nút Khóa / Mở khóa Click Zone
-    local LockBtn = Instance.new("TextButton")
-    LockBtn.Size = UDim2.new(0, 30, 0, 30)
-    LockBtn.Position = UDim2.new(0, 5, 0, 5)
-    LockBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    LockBtn.Text = "🔓"
-    LockBtn.TextSize = 14
-    LockBtn.Parent = ClickZoneBox
-
-    local LockC = Instance.new("UICorner")
-    LockC.CornerRadius = UDim.new(0, 6)
-    LockC.Parent = LockBtn
-
-    LockBtn.MouseButton1Click:Connect(function()
-        zoneLocked = not zoneLocked
-        if zoneLocked then
-            LockBtn.Text = "🔒"
-            ZoneStroke.Color = Color3.fromRGB(231, 76, 60)
-            ClickZoneBox.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-        else
-            LockBtn.Text = "🔓"
-            ZoneStroke.Color = Color3.fromRGB(46, 204, 113)
-            ClickZoneBox.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-        end
-    end)
-
     -- Kéo thả Click Zone & Lưu vị trí
     local dragZ, dInZ, dStartZ, sPosZ
     ClickZoneBox.InputBegan:Connect(function(i)
