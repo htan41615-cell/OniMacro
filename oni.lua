@@ -134,7 +134,8 @@ pcall(function()
     end
 
     ClickZoneBox.Visible = isZoneActive
-            -- Kéo thả nút 👹 & Tự động lưu vị trí khi thả tay
+
+    -- Kéo thả nút 👹 & Tự động lưu vị trí khi thả tay
     local dragT, dInT, dStartT, sPosT
     Tgl.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -338,7 +339,8 @@ pcall(function()
         TabTeleFrame.Visible = false TabCycleFrame.Visible = true
         TabTeleBtn.TextColor3 = Color3.fromRGB(140, 140, 140) TabCycleBtn.TextColor3 = Color3.fromRGB(231, 76, 60)
     end)
-            local SetMainContent = Instance.new("ScrollingFrame")
+
+    local SetMainContent = Instance.new("ScrollingFrame")
     SetMainContent.Size = UDim2.new(1, 0, 1, -30)
     SetMainContent.Position = UDim2.new(0, 0, 0, 30)
     SetMainContent.BackgroundTransparency = 1
