@@ -4,7 +4,6 @@ pcall(function()
     local TS = game:GetService("TweenService")
     local runService = game:GetService("RunService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
-    local HttpService = game:GetService("HttpService")
     
     local PG = LP:WaitForChild("PlayerGui")
     if PG:FindFirstChild("OniMacroHub") then PG.OniMacroHub:Destroy() end
@@ -14,67 +13,30 @@ pcall(function()
     Gui.ResetOnSpawn = false
     Gui.Parent = PG
 
-    -- Biến Dịch Chuyển (Waypoints)
-    local waypoints = {}
-    local wpCount = 0
-    local useTween = true
-
-    -- Biến Macro & Auto Click
     local isRecording = false
     local isPlaying = false
     local autoLoop = true
     local recordCameraMove = true
-    local returnToStart = true
+    local returnToStart = true -- Tùy chọn có dịch chuyển về vị trí cũ hay không (Mặc định: Bật)
+    
     local macroData = {}
     local savedMacros = {}
     local startTime = 0
     local playThread = nil
 
-    -- Biến Vùng Giới Hạn Click (Click Zone)
-    local zoneLocked = false
-    local isZoneActive = true
-
     -- Các mức kích thước Menu chính
     local sizes = {
-        {Size = UDim2.new(0, 260, 0, 420)}, -- Nhỏ
-        {Size = UDim2.new(0, 310, 0, 470)}, -- Vừa
-        {Size = UDim2.new(0, 360, 0, 520)}  -- Lớn
+        {Size = UDim2.new(0, 260, 0, 420), Offset = -210}, -- Nhỏ
+        {Size = UDim2.new(0, 310, 0, 470), Offset = -235}, -- Vừa
+        {Size = UDim2.new(0, 360, 0, 520), Offset = -260}  -- Lớn
     }
     local sizeNames = {"Nhỏ", "Vừa", "Lớn"}
-    local currentSizeIdx = 2
+    local currentSizeIdx = 2 -- Mặc định là Vừa
 
-    -- Tọa độ lưu mặc định
-    local savedMainPos = UDim2.new(0.5, -155, 0.5, -235)
-    local savedZonePos = UDim2.new(0.5, -80, 0.4, -50)
-    local savedTogglePos = UDim2.new(0.05, 0, 0.15, 0)
-
-    -- --- HỆ THỐNG TỰ ĐỘNG LƯU & TẢI CÀI ĐẶT + VỊ TRÍ ---
-    local settingFile = "OniMacro_Settings_v2.txt"
-    local function saveSettings(mainFrame, zoneFrame, toggleBtn)
-        local settingData = {
-            Loop = autoLoop,
-            Cam = recordCameraMove,
-            Return = returnToStart,
-            Zone = isZoneActive,
-            SizeIdx = currentSizeIdx,
-            MainXScale = mainFrame.Position.X.Scale, MainXOffset = mainFrame.Position.X.Offset,
-            MainYScale = mainFrame.Position.Y.Scale, MainYOffset = mainFrame.Position.Y.Offset,
-            ZoneXScale = zoneFrame.Position.X.Scale, ZoneXOffset = zoneFrame.Position.X.Offset,
-            ZoneYScale = zoneFrame.Position.Y.Scale, ZoneYOffset = zoneFrame.Position.Y.Offset,
-            TglXScale = toggleBtn.Position.X.Scale, TglXOffset = toggleBtn.Position.X.Offset,
-            TglYScale = toggleBtn.Position.Y.Scale, TglYOffset = toggleBtn.Position.Y.Offset,
-        }
-        if writefile then
-            pcall(function()
-                writefile(settingFile, HttpService:JSONEncode(settingData))
-            end)
-        end
-    end
-
-    -- Khởi tạo nút logo trước
+    -- Nút tròn logo ONI (👹)
     local Tgl = Instance.new("TextButton")
     Tgl.Size = UDim2.new(0, 50, 0, 50)
-    Tgl.Position = savedTogglePos
+    Tgl.Position = UDim2.new(0.05, 0, 0.25, 0)
     Tgl.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     Tgl.Text = "👹"
     Tgl.TextSize = 24
@@ -90,52 +52,7 @@ pcall(function()
     TglStroke.Thickness = 2
     TglStroke.Parent = Tgl
 
-    -- Khung Ô Vuông Click Zone
-    local ClickZoneBox = Instance.new("Frame")
-    ClickZoneBox.Size = UDim2.new(0, 160, 0, 100)
-    ClickZoneBox.Position = savedZonePos
-    ClickZoneBox.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-    ClickZoneBox.BackgroundTransparency = 0.85
-    ClickZoneBox.Visible = true
-    ClickZoneBox.Parent = Gui
-
-    local ZoneC = Instance.new("UICorner")
-    ZoneC.CornerRadius = UDim.new(0, 8)
-    ZoneC.Parent = ClickZoneBox
-
-    local ZoneStroke = Instance.new("UIStroke")
-    ZoneStroke.Color = Color3.fromRGB(46, 204, 113)
-    ZoneStroke.Thickness = 2
-    ZoneStroke.Parent = ClickZoneBox
-
-    -- Khung Menu chính
-    local Main = Instance.new("Frame")
-    Main.Size = sizes[currentSizeIdx].Size
-    Main.Position = savedMainPos
-    Main.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-    Main.Visible = false
-    Main.ClipsDescendants = true
-    Main.Parent = Gui
-
-    -- Tải dữ liệu đã lưu từ trước
-    if readfile and pcall(function() return readfile(settingFile) end) then
-        local success, data = pcall(function() return HttpService:JSONDecode(readfile(settingFile)) end)
-        if success and type(data) == "table" then
-            if data.Loop ~= nil then autoLoop = data.Loop end
-            if data.Cam ~= nil then recordCameraMove = data.Cam end
-            if data.Return ~= nil then returnToStart = data.Return end
-            if data.Zone ~= nil then isZoneActive = data.Zone end
-            if data.SizeIdx ~= nil and sizes[data.SizeIdx] then currentSizeIdx = data.SizeIdx Main.Size = sizes[currentSizeIdx].Size end
-            
-            if data.MainXScale then Main.Position = UDim2.new(data.MainXScale, data.MainXOffset, data.MainYScale, data.MainYOffset) end
-            if data.ZoneXScale then ClickZoneBox.Position = UDim2.new(data.ZoneXScale, data.ZoneXOffset, data.ZoneYScale, data.ZoneYOffset) end
-            if data.TglXScale then Tgl.Position = UDim2.new(data.TglXScale, data.TglXOffset, data.TglYScale, data.TglYOffset) end
-        end
-    end
-
-    ClickZoneBox.Visible = isZoneActive
-
-    -- Kéo thả nút 👹 & Tự động lưu vị trí khi thả tay
+    -- Kéo thả nút logo
     local dragT, dInT, dStartT, sPosT
     Tgl.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -152,39 +69,17 @@ pcall(function()
         end
     end)
     UIS.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            if dragT then dragT = false saveSettings(Main, ClickZoneBox, Tgl) end
-        end
-    end)
-    -- Kéo thả Click Zone & Lưu vị trí
-    local dragZ, dInZ, dStartZ, sPosZ
-    ClickZoneBox.InputBegan:Connect(function(i)
-        if zoneLocked then return end
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragZ = true dStartZ = i.Position sPosZ = ClickZoneBox.Position
-        end
-    end)
-    ClickZoneBox.InputChanged:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement then dInZ = i end
-    end)
-    UIS.InputChanged:Connect(function(i)
-        if i == dInZ and dragZ and not zoneLocked then
-            local delta = i.Position - dStartZ
-            ClickZoneBox.Position = UDim2.new(sPosZ.X.Scale, sPosZ.X.Offset + delta.X, sPosZ.Y.Scale, sPosZ.Y.Offset + delta.Y)
-        end
-    end)
-    UIS.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            if dragZ then dragZ = false saveSettings(Main, ClickZoneBox, Tgl) end
-        end
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then dragT = false end
     end)
 
-    local function isInsideZone(x, y)
-        if not isZoneActive then return true end
-        local absPos = ClickZoneBox.AbsolutePosition
-        local absSize = ClickZoneBox.AbsoluteSize
-        return (x >= absPos.X and x <= absPos.X + absSize.X and y >= absPos.Y and y <= absPos.Y + absSize.Y)
-    end
+    -- Khung Menu chính
+    local Main = Instance.new("Frame")
+    Main.Size = sizes[currentSizeIdx].Size
+    Main.Position = UDim2.new(0.5, -Main.Size.X.Offset/2, 0.5, sizes[currentSizeIdx].Offset)
+    Main.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    Main.Visible = false
+    Main.ClipsDescendants = true
+    Main.Parent = Gui
 
     local MainC = Instance.new("UICorner")
     MainC.CornerRadius = UDim.new(0, 10)
@@ -195,7 +90,7 @@ pcall(function()
     MainStroke.Thickness = 1.5
     MainStroke.Parent = Main
 
-    -- Thanh Tiêu Đề
+    -- Thanh tiêu đề
     local Bar = Instance.new("Frame")
     Bar.Size = UDim2.new(1, 0, 0, 40)
     Bar.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
@@ -216,7 +111,17 @@ pcall(function()
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = Bar
 
-    -- Kéo thả Menu chính & Lưu vị trí
+    -- Nút Cài đặt (⚙️)
+    local SetBtn = Instance.new("TextButton")
+    SetBtn.Size = UDim2.new(0, 30, 0, 30)
+    SetBtn.Position = UDim2.new(1, -35, 0, 5)
+    SetBtn.BackgroundTransparency = 1
+    SetBtn.Text = "⚙️"
+    SetBtn.TextSize = 16
+    SetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SetBtn.Parent = Bar
+
+    -- Kéo thả bảng chính
     local dragM, dInM, dStartM, sPosM
     Bar.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -233,124 +138,15 @@ pcall(function()
         end
     end)
     UIS.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            if dragM then dragM = false saveSettings(Main, ClickZoneBox, Tgl) end
-        end
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then dragM = false end
     end)
 
-    -- Nút Cài Đặt (⚙️)
-    local SetBtn = Instance.new("TextButton")
-    SetBtn.Size = UDim2.new(0, 30, 0, 30)
-    SetBtn.Position = UDim2.new(1, -35, 0, 5)
-    SetBtn.BackgroundTransparency = 1
-    SetBtn.Text = "⚙️"
-    SetBtn.TextSize = 16
-    SetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SetBtn.Parent = Bar
-
-    -- Thanh Tab chuyển đổi (Dịch Chuyển <-> Hành Động)
-    local TabBar = Instance.new("Frame")
-    TabBar.Size = UDim2.new(1, 0, 0, 35)
-    TabBar.Position = UDim2.new(0, 0, 0, 40)
-    TabBar.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
-    TabBar.Parent = Main
-
+    -- Nội dung chính
     local Content = Instance.new("Frame")
-    Content.Size = UDim2.new(1, 0, 1, -75)
-    Content.Position = UDim2.new(0, 0, 0, 75)
+    Content.Size = UDim2.new(1, 0, 1, -40)
+    Content.Position = UDim2.new(0, 0, 0, 40)
     Content.BackgroundTransparency = 1
     Content.Parent = Main
-
-    local TabTeleFrame = Instance.new("Frame")
-    TabTeleFrame.Size = UDim2.new(1, 0, 1, 0)
-    TabTeleFrame.BackgroundTransparency = 1
-    TabTeleFrame.Parent = Content
-
-    local TabCycleFrame = Instance.new("Frame")
-    TabCycleFrame.Size = UDim2.new(1, 0, 1, 0)
-    TabCycleFrame.BackgroundTransparency = 1
-    TabCycleFrame.Visible = false
-    TabCycleFrame.Parent = Content
-
-    -- BẢNG CÀI ĐẶT CHÍNH
-    local SetFrame = Instance.new("Frame")
-    SetFrame.Size = UDim2.new(1, 0, 1, 0)
-    SetFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    SetFrame.Visible = false
-    SetFrame.ZIndex = 10
-    SetFrame.Parent = Content
-
-    local SetTabBar = Instance.new("Frame")
-    SetTabBar.Size = UDim2.new(1, 0, 0, 30)
-    SetTabBar.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-    SetTabBar.ZIndex = 11
-    SetTabBar.Parent = SetFrame
-
-    local function CreateTabBtn(text, pos, sizeX, parent)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0, sizeX, 1, 0)
-        b.Position = pos
-        b.BackgroundTransparency = 1
-        b.Text = text
-        b.TextColor3 = Color3.fromRGB(140, 140, 140)
-        b.Font = Enum.Font.SourceSansBold
-        b.TextSize = 11
-        b.ZIndex = 12
-        b.Parent = parent
-        return b
-    end
-
-    local TabTeleBtn = CreateTabBtn("📍 DỊCH CHUYỂN", UDim2.new(0, 0, 0, 0), 155, TabBar)
-    local TabCycleBtn = CreateTabBtn("👹 HÀNH ĐỘNG", UDim2.new(0, 155, 0, 0), 155, TabBar)
-    TabTeleBtn.TextColor3 = Color3.fromRGB(231, 76, 60)
-
-    TabTeleBtn.MouseButton1Click:Connect(function()
-        TabTeleFrame.Visible = true TabCycleFrame.Visible = false
-        TabTeleBtn.TextColor3 = Color3.fromRGB(231, 76, 60) TabCycleBtn.TextColor3 = Color3.fromRGB(140, 140, 140)
-    end)
-    TabCycleBtn.MouseButton1Click:Connect(function()
-        TabTeleFrame.Visible = false TabCycleFrame.Visible = true
-        TabTeleBtn.TextColor3 = Color3.fromRGB(140, 140, 140) TabCycleBtn.TextColor3 = Color3.fromRGB(231, 76, 60)
-    end)
-
-    local SetMainContent = Instance.new("ScrollingFrame")
-    SetMainContent.Size = UDim2.new(1, 0, 1, -30)
-    SetMainContent.Position = UDim2.new(0, 0, 0, 30)
-    SetMainContent.BackgroundTransparency = 1
-    SetMainContent.CanvasSize = UDim2.new(0, 0, 0, 280)
-    SetMainContent.ScrollBarThickness = 4
-    SetMainContent.ZIndex = 11
-    SetMainContent.Parent = SetFrame
-
-    local SetWpContent = Instance.new("ScrollingFrame")
-    SetWpContent.Size = UDim2.new(1, 0, 1, -30)
-    SetWpContent.Position = UDim2.new(0, 0, 0, 30)
-    SetWpContent.BackgroundTransparency = 1
-    SetWpContent.Visible = false
-    SetWpContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    SetWpContent.ScrollBarThickness = 4
-    SetWpContent.ZIndex = 11
-    SetWpContent.Parent = SetFrame
-
-    local SetWpLayout = Instance.new("UIListLayout")
-    SetWpLayout.Parent = SetWpContent
-    SetWpLayout.Padding = UDim.new(0, 5)
-    SetWpLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        SetWpContent.CanvasSize = UDim2.new(0, 0, 0, SetWpLayout.AbsoluteContentSize.Y + 10)
-    end)
-
-    local SetTab1Btn = CreateTabBtn("⚙️ CÀI ĐẶT CHÍNH", UDim2.new(0, 0, 0, 0), 155, SetTabBar)
-    local SetTab2Btn = CreateTabBtn("🗑️ XÓA ĐIỂM", UDim2.new(0, 155, 0, 0), 155, SetTabBar)
-    SetTab1Btn.TextColor3 = Color3.fromRGB(231, 76, 60)
-
-    SetTab1Btn.MouseButton1Click:Connect(function()
-        SetMainContent.Visible = true SetWpContent.Visible = false
-        SetTab1Btn.TextColor3 = Color3.fromRGB(231, 76, 60) SetTab2Btn.TextColor3 = Color3.fromRGB(140, 140, 140)
-    end)
-    SetTab2Btn.MouseButton1Click:Connect(function()
-        SetMainContent.Visible = false SetWpContent.Visible = true
-        SetTab1Btn.TextColor3 = Color3.fromRGB(140, 140, 140) SetTab2Btn.TextColor3 = Color3.fromRGB(231, 76, 60)
-    end)
 
     local function CreateBtn(text, color, pos, sizeX, sizeY, parent)
         local b = Instance.new("TextButton")
@@ -368,61 +164,32 @@ pcall(function()
         return b
     end
 
-    local function CreateRow(text, pos, parent)
-        local f = Instance.new("Frame")
-        f.Size = UDim2.new(1, -20, 0, 35)
-        f.Position = UDim2.new(0, 10, 0, pos)
-        f.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        f.Parent = parent
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 6)
-        c.Parent = f
-        local l = Instance.new("TextLabel")
-        l.Size = UDim2.new(1, -110, 1, 0)
-        l.Position = UDim2.new(0, 10, 0, 0)
-        l.BackgroundTransparency = 1
-        l.Text = text
-        l.TextColor3 = Color3.fromRGB(200, 200, 200)
-        l.TextSize = 12
-        l.Font = Enum.Font.SourceSansBold
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.Parent = f
-        return f, l
-    end
+    local RecordBtn = CreateBtn("🔴 Ghi Hành Động", Color3.fromRGB(192, 57, 43), UDim2.new(0, 10, 0, 10), 135, 35, Content)
+    local StopBtn = CreateBtn("⏹️ Dừng", Color3.fromRGB(127, 140, 141), UDim2.new(1, -145, 0, 10), 135, 35, Content)
+    local PlayBtn = CreateBtn("▶️ Phát Oni Macro", Color3.fromRGB(41, 128, 185), UDim2.new(0, 10, 0, 55), 280, 35, Content)
 
-    -- --- TAB 1: DỊCH CHUYỂN ---
-    local SaveBtn = CreateBtn("Lưu Vị Trí", Color3.fromRGB(46, 204, 113), UDim2.new(0, 10, 0, 10), 135, 35, TabTeleFrame)
-    local ClearAllBtn = CreateBtn("Xóa Hết", Color3.fromRGB(231, 76, 60), UDim2.new(1, -145, 0, 10), 135, 35, TabTeleFrame)
+    -- Danh sách các bản lưu Slot
+    local ListLabel = Instance.new("TextLabel")
+    ListLabel.Size = UDim2.new(1, -20, 0, 20)
+    ListLabel.Position = UDim2.new(0, 10, 0, 95)
+    ListLabel.BackgroundTransparency = 1
+    ListLabel.Text = "📁 DANH SÁCH ONI MACRO SLOTS:"
+    ListLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    ListLabel.TextSize = 12
+    ListLabel.Font = Enum.Font.SourceSansBold
+    ListLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ListLabel.Parent = Content
 
-    local Scroll = Instance.new("ScrollingFrame")
-    Scroll.Size = UDim2.new(1, -20, 1, -55)
-    Scroll.Position = UDim2.new(0, 10, 0, 50)
-    Scroll.BackgroundTransparency = 1
-    Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    Scroll.ScrollBarThickness = 4
-    Scroll.Parent = TabTeleFrame
-
-    local List = Instance.new("UIListLayout")
-    List.Parent = Scroll
-    List.Padding = UDim.new(0, 6)
-    List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        Scroll.CanvasSize = UDim2.new(0, 0, 0, List.AbsoluteContentSize.Y + 5)
-    end)
-
-    -- --- TAB 2: HÀNH ĐỘNG ---
-    local RecordBtn = CreateBtn("🔴 Ghi Hành Động", Color3.fromRGB(192, 57, 43), UDim2.new(0, 10, 0, 10), 135, 35, TabCycleFrame)
-    local StopBtn = CreateBtn("⏹️ Dừng", Color3.fromRGB(127, 140, 141), UDim2.new(1, -145, 0, 10), 135, 35, TabCycleFrame)
-    local PlayBtn = CreateBtn("▶️ Phát Oni Macro", Color3.fromRGB(41, 128, 185), UDim2.new(0, 10, 0, 55), 280, 35, TabCycleFrame)
-    local SaveSlotBtn = CreateBtn("💾 Lưu Macro Hiện Tại", Color3.fromRGB(142, 68, 173), UDim2.new(0, 10, 0, 95), 280, 30, TabCycleFrame)
+    local SaveSlotBtn = CreateBtn("💾 Lưu Macro Hiện Tại", Color3.fromRGB(142, 68, 173), UDim2.new(0, 10, 0, 120), 280, 30, Content)
 
     local ScrollSlots = Instance.new("ScrollingFrame")
-    ScrollSlots.Size = UDim2.new(1, -20, 1, -135)
-    ScrollSlots.Position = UDim2.new(0, 10, 0, 130)
+    ScrollSlots.Size = UDim2.new(1, -20, 0, 200)
+    ScrollSlots.Position = UDim2.new(0, 10, 0, 155)
     ScrollSlots.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     ScrollSlots.BorderSizePixel = 0
     ScrollSlots.CanvasSize = UDim2.new(0, 0, 0, 0)
     ScrollSlots.ScrollBarThickness = 4
-    ScrollSlots.Parent = TabCycleFrame
+    ScrollSlots.Parent = Content
 
     local ScrollC = Instance.new("UICorner")
     ScrollC.CornerRadius = UDim.new(0, 6)
@@ -435,80 +202,382 @@ pcall(function()
         ScrollSlots.CanvasSize = UDim2.new(0, 0, 0, SlotLayout.AbsoluteContentSize.Y + 5)
     end)
 
-    -- --- CÁC MỤC TRONG TAB 1 CÀI ĐẶT CHÍNH ---
-    local LoopRow, LoopLabel = CreateRow("Tự động lặp lại (Loop):", 10, SetMainContent)
-    LoopRow.ZIndex = 12 LoopLabel.ZIndex = 12
-    local LoopBtn = CreateBtn(autoLoop and "Bật (ON)" or "Tắt (OFF)", autoLoop and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166), UDim2.new(1, -95, 0, 4), 85, 27, LoopRow)
-    LoopBtn.ZIndex = 13
+    -- BẢNG CÀI ĐẶT ⚙️
+    local SetFrame = Instance.new("Frame")
+    SetFrame.Size = UDim2.new(1, 0, 1, 0)
+    SetFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    SetFrame.Visible = false
+    SetFrame.ZIndex = 5
+    SetFrame.Parent = Main
+
+    local SetTitle = Instance.new("TextLabel")
+    SetTitle.Size = UDim2.new(1, -20, 0, 35)
+    SetTitle.Position = UDim2.new(0, 10, 0, 8)
+    SetTitle.BackgroundTransparency = 1
+    SetTitle.Text = "⚙️ CÀI ĐẶT ONI MACRO"
+    SetTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SetTitle.TextSize = 14
+    SetTitle.Font = Enum.Font.SourceSansBold
+    SetTitle.TextXAlignment = Enum.TextXAlignment.Left
+    SetTitle.ZIndex = 6
+    SetTitle.Parent = SetFrame
+
+    -- 1. Cài đặt Lặp Lại
+    local LoopToggleRow = Instance.new("Frame")
+    LoopToggleRow.Size = UDim2.new(1, -20, 0, 35)
+    LoopToggleRow.Position = UDim2.new(0, 10, 0, 48)
+    LoopToggleRow.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    LoopToggleRow.ZIndex = 6
+    LoopToggleRow.Parent = SetFrame
+
+    local LoopC = Instance.new("UICorner")
+    LoopC.CornerRadius = UDim.new(0, 6)
+    LoopC.Parent = LoopToggleRow
+
+    local LoopLabel = Instance.new("TextLabel")
+    LoopLabel.Size = UDim2.new(1, -110, 1, 0)
+    LoopLabel.Position = UDim2.new(0, 10, 0, 0)
+    LoopLabel.BackgroundTransparency = 1
+    LoopLabel.Text = "Tự động lặp lại (Loop):"
+    LoopLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    LoopLabel.TextSize = 12
+    LoopLabel.Font = Enum.Font.SourceSansBold
+    LoopLabel.TextXAlignment = Enum.TextXAlignment.Left
+    LoopLabel.ZIndex = 6
+    LoopLabel.Parent = LoopToggleRow
+
+    local LoopBtn = CreateBtn("Bật (ON)", Color3.fromRGB(39, 174, 96), UDim2.new(1, -95, 0, 4), 85, 27, LoopToggleRow)
+    LoopBtn.ZIndex = 6
 
     LoopBtn.MouseButton1Click:Connect(function()
         autoLoop = not autoLoop
-        LoopBtn.Text = autoLoop and "Bật (ON)" or "Tắt (OFF)"
-        LoopBtn.BackgroundColor3 = autoLoop and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166)
-        saveSettings(Main, ClickZoneBox, Tgl)
+        if autoLoop then
+            LoopBtn.Text = "Bật (ON)"
+            LoopBtn.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
+        else
+            LoopBtn.Text = "Tắt (OFF)"
+            LoopBtn.BackgroundColor3 = Color3.fromRGB(149, 165, 166)
+        end
     end)
 
-    local CamRow, CamLabel = CreateRow("Lưu Hướng Camera:", 55, SetMainContent)
-    CamRow.ZIndex = 12 CamLabel.ZIndex = 12
-    local CamBtn = CreateBtn(recordCameraMove and "Bật (ON)" or "Tắt (OFF)", recordCameraMove and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166), UDim2.new(1, -95, 0, 4), 85, 27, CamRow)
-    CamBtn.ZIndex = 13
+    -- 2. Cài đặt Lưu Hướng Cam
+    local CamToggleRow = Instance.new("Frame")
+    CamToggleRow.Size = UDim2.new(1, -20, 0, 35)
+    CamToggleRow.Position = UDim2.new(0, 10, 0, 88)
+    CamToggleRow.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    CamToggleRow.ZIndex = 6
+    CamToggleRow.Parent = SetFrame
+
+    local CamC = Instance.new("UICorner")
+    CamC.CornerRadius = UDim.new(0, 6)
+    CamC.Parent = CamToggleRow
+
+    local CamLabel = Instance.new("TextLabel")
+    CamLabel.Size = UDim2.new(1, -110, 1, 0)
+    CamLabel.Position = UDim2.new(0, 10, 0, 0)
+    CamLabel.BackgroundTransparency = 1
+    CamLabel.Text = "Lưu Hướng Camera:"
+    CamLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    CamLabel.TextSize = 12
+    CamLabel.Font = Enum.Font.SourceSansBold
+    CamLabel.TextXAlignment = Enum.TextXAlignment.Left
+    CamLabel.ZIndex = 6
+    CamLabel.Parent = CamToggleRow
+
+    local CamBtn = CreateBtn("Bật (ON)", Color3.fromRGB(39, 174, 96), UDim2.new(1, -95, 0, 4), 85, 27, CamToggleRow)
+    CamBtn.ZIndex = 6
 
     CamBtn.MouseButton1Click:Connect(function()
         recordCameraMove = not recordCameraMove
-        CamBtn.Text = recordCameraMove and "Bật (ON)" or "Tắt (OFF)"
-        CamBtn.BackgroundColor3 = recordCameraMove and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166)
-        saveSettings(Main, ClickZoneBox, Tgl)
+        if recordCameraMove then
+            CamBtn.Text = "Bật (ON)"
+            CamBtn.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
+        else
+            CamBtn.Text = "Tắt (OFF)"
+            CamBtn.BackgroundColor3 = Color3.fromRGB(149, 165, 166)
+        end
     end)
 
-    local ReturnRow, ReturnLabel = CreateRow("Quay Về Điểm Đầu:", 100, SetMainContent)
-    ReturnRow.ZIndex = 12 ReturnLabel.ZIndex = 12
-    local ReturnBtn = CreateBtn(returnToStart and "Bật (ON)" or "Tắt (OFF)", returnToStart and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166), UDim2.new(1, -95, 0, 4), 85, 27, ReturnRow)
-    ReturnBtn.ZIndex = 13
+    -- 3. Cài đặt Quay Về Vị Trí Cũ (Return to Start)
+    local ReturnToggleRow = Instance.new("Frame")
+    ReturnToggleRow.Size = UDim2.new(1, -20, 0, 35)
+    ReturnToggleRow.Position = UDim2.new(0, 10, 0, 128)
+    ReturnToggleRow.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ReturnToggleRow.ZIndex = 6
+    ReturnToggleRow.Parent = SetFrame
+
+    local ReturnC = Instance.new("UICorner")
+    ReturnC.CornerRadius = UDim.new(0, 6)
+    ReturnC.Parent = ReturnToggleRow
+
+    local ReturnLabel = Instance.new("TextLabel")
+    ReturnLabel.Size = UDim2.new(1, -110, 1, 0)
+    ReturnLabel.Position = UDim2.new(0, 10, 0, 0)
+    ReturnLabel.BackgroundTransparency = 1
+    ReturnLabel.Text = "Về Vị Trí Cũ Khi Lặp:"
+    ReturnLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    ReturnLabel.TextSize = 11
+    ReturnLabel.Font = Enum.Font.SourceSansBold
+    ReturnLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ReturnLabel.ZIndex = 6
+    ReturnLabel.Parent = ReturnToggleRow
+
+    local ReturnBtn = CreateBtn("Bật (ON)", Color3.fromRGB(39, 174, 96), UDim2.new(1, -95, 0, 4), 85, 27, ReturnToggleRow)
+    ReturnBtn.ZIndex = 6
 
     ReturnBtn.MouseButton1Click:Connect(function()
         returnToStart = not returnToStart
-        ReturnBtn.Text = returnToStart and "Bật (ON)" or "Tắt (OFF)"
-        ReturnBtn.BackgroundColor3 = returnToStart and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166)
-        saveSettings(Main, ClickZoneBox, Tgl)
+        if returnToStart then
+            ReturnBtn.Text = "Bật (ON)"
+            ReturnBtn.BackgroundColor3 = Color3.fromRGB(39, 174, 96)
+        else
+            ReturnBtn.Text = "Tắt (OFF)"
+            ReturnBtn.BackgroundColor3 = Color3.fromRGB(149, 165, 166)
+        end
     end)
 
-    local ZoneRow, ZoneLabel = CreateRow("Khung Giới Hạn Click:", 145, SetMainContent)
-    ZoneRow.ZIndex = 12 ZoneLabel.ZIndex = 12
-    local ZoneBtn = CreateBtn(isZoneActive and "Hiển Thị" or "Ẩn", isZoneActive and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(149, 165, 166), UDim2.new(1, -95, 0, 4), 85, 27, ZoneRow)
-    ZoneBtn.ZIndex = 13
+    -- 4. Cài đặt Thay đổi Kích Cỡ Menu
+    local SizeToggleRow = Instance.new("Frame")
+    SizeToggleRow.Size = UDim2.new(1, -20, 0, 35)
+    SizeToggleRow.Position = UDim2.new(0, 10, 0, 168)
+    SizeToggleRow.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    SizeToggleRow.ZIndex = 6
+    SizeToggleRow.Parent = SetFrame
 
-    ZoneBtn.MouseButton1Click:Connect(function()
-        isZoneActive = not isZoneActive
-        ClickZoneBox.Visible = isZoneActive
-        ZoneBtn.Text = isZoneActive and "Hiển Thị" or "Ẩn"
-        ZoneBtn.BackgroundColor3 = isZoneActive and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(149, 165, 166)
-        saveSettings(Main, ClickZoneBox, Tgl)
-    end)
+    local SizeC = Instance.new("UICorner")
+    SizeC.CornerRadius = UDim.new(0, 6)
+    SizeC.Parent = SizeToggleRow
 
-    local SizeRow, SizeLabel = CreateRow("Kích Thước Menu:", 190, SetMainContent)
-    SizeRow.ZIndex = 12 SizeLabel.ZIndex = 12
-    local SizeBtn = CreateBtn(sizeNames[currentSizeIdx], Color3.fromRGB(52, 152, 219), UDim2.new(1, -95, 0, 4), 85, 27, SizeRow)
-    SizeBtn.ZIndex = 13
+    local SizeLabel = Instance.new("TextLabel")
+    SizeLabel.Size = UDim2.new(1, -110, 1, 0)
+    SizeLabel.Position = UDim2.new(0, 10, 0, 0)
+    SizeLabel.BackgroundTransparency = 1
+    SizeLabel.Text = "Kích Cỡ Menu:"
+    SizeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    SizeLabel.TextSize = 12
+    SizeLabel.Font = Enum.Font.SourceSansBold
+    SizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SizeLabel.ZIndex = 6
+    SizeLabel.Parent = SizeToggleRow
+
+    local SizeBtn = CreateBtn(sizeNames[currentSizeIdx], Color3.fromRGB(41, 128, 185), UDim2.new(1, -95, 0, 4), 85, 27, SizeToggleRow)
+    SizeBtn.ZIndex = 6
 
     SizeBtn.MouseButton1Click:Connect(function()
-        currentSizeIdx = currentSizeIdx + 1
-        if currentSizeIdx > #sizes then currentSizeIdx = 1 end
-        Main.Size = sizes[currentSizeIdx].Size
+        currentSizeIdx = currentSizeIdx % #sizes + 1
         SizeBtn.Text = sizeNames[currentSizeIdx]
-        saveSettings(Main, ClickZoneBox, Tgl)
+        
+        local target = sizes[currentSizeIdx]
+        Main.Size = target.Size
+        Main.Position = UDim2.new(0.5, -target.Size.X.Offset/2, 0.5, target.Offset)
+        
+        if currentSizeIdx == 1 then
+            ScrollSlots.Size = UDim2.new(1, -20, 0, 150)
+        elseif currentSizeIdx == 2 then
+            ScrollSlots.Size = UDim2.new(1, -20, 0, 200)
+        else
+            ScrollSlots.Size = UDim2.new(1, -20, 0, 250)
+        end
     end)
 
-    -- Mở / Đóng bảng Cài Đặt
-    SetBtn.MouseButton1Click:Connect(function()
-        SetFrame.Visible = not SetFrame.Visible
-    end)
+    -- Nút Quay Lại
+    local BackBtn = CreateBtn("⬅️ Quay Lại", Color3.fromRGB(52, 152, 219), UDim2.new(0, 10, 0, 215), 280, 35, SetFrame)
+    BackBtn.ZIndex = 6
 
-    -- Đóng / Mở Menu chính khi bấm vào nút 👹
-    local mainToggled = false
+    SetBtn.MouseButton1Click:Connect(function() SetFrame.Visible = true end)
+    BackBtn.MouseButton1Click:Connect(function() SetFrame.Visible = false end)
+
     Tgl.MouseButton1Click:Connect(function()
-        if dragT then return end
-        mainToggled = not mainToggled
-        Main.Visible = mainToggled
-        if not mainToggled then SetFrame.Visible = false end
+        local target = sizes[currentSizeIdx]
+        if Main.Visible then
+            local t = TS:Create(Main, TweenInfo.new(0.2), {Size = UDim2.new(0, 0, 0, 0)}) t:Play()
+            t.Completed:Connect(function() Main.Visible = false Main.Size = target.Size end)
+        else
+            Main.Size = UDim2.new(0, 0, 0, 0) Main.Visible = true 
+            TS:Create(Main, TweenInfo.new(0.2), {Size = target.Size}):Play()
+        end
+    end)
+
+    -- LOGIC GHI HÀNH ĐỘNG
+    local function recordEvent(type, data)
+        if not isRecording then return end
+        table.insert(macroData, {
+            Time = tick() - startTime,
+            Type = type,
+            Data = data
+        })
+    end
+
+    UIS.InputBegan:Connect(function(input)
+        if not isRecording then return end
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            recordEvent("KeyDown", input.KeyCode)
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local pos = input.Position
+            recordEvent("Click", {pos.X, pos.Y})
+        end
+    end)
+
+    UIS.InputEnded:Connect(function(input)
+        if not isRecording then return end
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            recordEvent("KeyUp", input.KeyCode)
+        end
+    end)
+
+    runService.RenderStepped:Connect(function()
+        if not isRecording then return end
+        if recordCameraMove then
+            local cam = workspace.CurrentCamera
+            if cam then
+                recordEvent("Cam", cam.CFrame)
+            end
+        end
+        local char = LP.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
+            recordEvent("Pos", {char.HumanoidRootPart.CFrame, char.Humanoid.MoveDirection})
+        end
+    end)
+
+    RecordBtn.MouseButton1Click:Connect(function()
+        if isPlaying then return end
+        isRecording = true
+        macroData = {}
+        startTime = tick()
+        RecordBtn.Text = "🔴 Đang Ghi..."
+        PlayBtn.Text = "Không thể phát khi đang ghi"
+    end)
+
+    StopBtn.MouseButton1Click:Connect(function()
+        isRecording = false
+        if isPlaying then
+            isPlaying = false
+            if playThread then
+                task.cancel(playThread)
+                playThread = nil
+            end
+        end
+        RecordBtn.Text = "🔴 Ghi Hành Động"
+        PlayBtn.Text = "▶️ Phát Oni Macro"
+    end)
+
+    local function refreshSlotUI()
+        for _, c in ipairs(ScrollSlots:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+
+        for name, data in pairs(savedMacros) do
+            local f = Instance.new("Frame")
+            f.Size = UDim2.new(1, -10, 0, 35)
+            f.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            f.Parent = ScrollSlots
+
+            local fc = Instance.new("UICorner")
+            fc.CornerRadius = UDim.new(0, 5)
+            fc.Parent = f
+
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, -95, 1, 0)
+            lbl.Position = UDim2.new(0, 8, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = Color3.fromRGB(240, 240, 240)
+            lbl.TextSize = 12
+            lbl.Font = Enum.Font.SourceSansBold
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Parent = f
+
+            local loadBtn = CreateBtn("Chạy", Color3.fromRGB(39, 174, 96), UDim2.new(1, -90, 0, 5), 40, 25, f)
+            loadBtn.TextSize = 11
+            loadBtn.MouseButton1Click:Connect(function()
+                macroData = data
+                PlayBtn.Text = "▶️ Phát: " + name
+            end)
+
+            local delBtn = CreateBtn("Xóa", Color3.fromRGB(192, 57, 43), UDim2.new(1, -45, 0, 5), 40, 25, f)
+            delBtn.TextSize = 11
+            delBtn.MouseButton1Click:Connect(function()
+                savedMacros[name] = nil
+                refreshSlotUI()
+            end)
+        end
+    end
+
+    SaveSlotBtn.MouseButton1Click:Connect(function()
+        if #macroData == 0 then return end
+        local slotName = "Oni_" .. (os.date("%H:%M:%S"))
+        savedMacros[slotName] = macroData
+        refreshSlotUI()
+    end)
+
+    -- LOGIC PHÁT LẠI HÀNH ĐỘNG
+    PlayBtn.MouseButton1Click:Connect(function()
+        if isRecording or #macroData == 0 or isPlaying then return end
+        isPlaying = true
+        PlayBtn.Text = "🔵 Đang Phát Oni Macro..."
+        
+        -- Lưu lại vị trí ban đầu của nhân vật trước khi bắt đầu phát macro
+        local startCf = nil
+        local char = LP.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            startCf = char.HumanoidRootPart.CFrame
+        end
+        
+        playThread = task.spawn(function()
+            while isPlaying do
+                local playStart = tick()
+                local duration = macroData[#macroData].Time
+                local index = 1
+
+                while isPlaying and (tick() - playStart) <= duration + 0.1 do
+                    local elapsed = tick() - playStart
+                    while index <= #macroData and macroData[index].Time <= elapsed do
+                        if not isPlaying then break end
+                        local event = macroData[index]
+                        
+                        if event.Type == "KeyDown" then
+                            if event.Data == Enum.KeyCode.Space then
+                                local c = LP.Character
+                                if c and c:FindFirstChildOfClass("Humanoid") then c.Humanoid.Jump = true end
+                            end
+                        elseif event.Type == "Click" then
+                            VirtualInputManager:SendMouseButtonEvent(event.Data[1], event.Data[2], 0, true, game, 1)
+                            VirtualInputManager:SendMouseButtonEvent(event.Data[1], event.Data[2], 0, false, game, 1)
+                        elseif event.Type == "Cam" then
+                            local cam = workspace.CurrentCamera
+                            if cam then
+                                cam.CFrame = event.Data
+                            end
+                        elseif event.Type == "Pos" then
+                            local c = LP.Character
+                            if c and c:FindFirstChild("HumanoidRootPart") and c:FindFirstChildOfClass("Humanoid") then
+                                c.HumanoidRootPart.CFrame = event.Data[1]
+                                c.Humanoid:Move(event.Data[2], true)
+                            end
+                        end
+                        index = index + 1
+                    end
+                    task.wait(0.01)
+                end
+
+                if not autoLoop then
+                    break
+                end
+                
+                -- Nếu bật tính năng "Về Vị Trí Cũ Khi Lặp", nhân vật sẽ dịch chuyển về chỗ lúc đầu bấm phát
+                if returnToStart and startCf then
+                    local c = LP.Character
+                    if c and c:FindFirstChild("HumanoidRootPart") then
+                        c.HumanoidRootPart.CFrame = startCf
+                    end
+                end
+                
+                task.wait(0.1)
+            end
+
+            isPlaying = false
+            PlayBtn.Text = "▶️ Phát Oni Macro"
+        end)
     end)
 end)
+        
