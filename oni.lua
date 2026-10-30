@@ -134,8 +134,7 @@ pcall(function()
     end
 
     ClickZoneBox.Visible = isZoneActive
-
-    -- Kéo thả nút 👹 & Tự động lưu vị trí khi thả tay
+            -- Kéo thả nút 👹 & Tự động lưu vị trí khi thả tay
     local dragT, dInT, dStartT, sPosT
     Tgl.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -339,8 +338,7 @@ pcall(function()
         TabTeleFrame.Visible = false TabCycleFrame.Visible = true
         TabTeleBtn.TextColor3 = Color3.fromRGB(140, 140, 140) TabCycleBtn.TextColor3 = Color3.fromRGB(231, 76, 60)
     end)
-
-    local SetMainContent = Instance.new("ScrollingFrame")
+            local SetMainContent = Instance.new("ScrollingFrame")
     SetMainContent.Size = UDim2.new(1, 0, 1, -30)
     SetMainContent.Position = UDim2.new(0, 0, 0, 30)
     SetMainContent.BackgroundTransparency = 1
@@ -483,4 +481,59 @@ pcall(function()
     CamBtn.MouseButton1Click:Connect(function()
         recordCameraMove = not recordCameraMove
         CamBtn.Text = recordCameraMove and "Bật (ON)" or "Tắt (OFF)"
-        CamBtn.BackgroundColor
+        CamBtn.BackgroundColor3 = recordCameraMove and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166)
+        saveSettings(Main, ClickZoneBox, Tgl)
+    end)
+
+    local ReturnRow, ReturnLabel = CreateRow("Quay Về Điểm Đầu:", 100, SetMainContent)
+    ReturnRow.ZIndex = 12 ReturnLabel.ZIndex = 12
+    local ReturnBtn = CreateBtn(returnToStart and "Bật (ON)" or "Tắt (OFF)", returnToStart and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166), UDim2.new(1, -95, 0, 4), 85, 27, ReturnRow)
+    ReturnBtn.ZIndex = 13
+
+    ReturnBtn.MouseButton1Click:Connect(function()
+        returnToStart = not returnToStart
+        ReturnBtn.Text = returnToStart and "Bật (ON)" or "Tắt (OFF)"
+        ReturnBtn.BackgroundColor3 = returnToStart and Color3.fromRGB(39, 174, 96) or Color3.fromRGB(149, 165, 166)
+        saveSettings(Main, ClickZoneBox, Tgl)
+    end)
+
+    local ZoneRow, ZoneLabel = CreateRow("Khung Giới Hạn Click:", 145, SetMainContent)
+    ZoneRow.ZIndex = 12 ZoneLabel.ZIndex = 12
+    local ZoneBtn = CreateBtn(isZoneActive and "Hiển Thị" or "Ẩn", isZoneActive and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(149, 165, 166), UDim2.new(1, -95, 0, 4), 85, 27, ZoneRow)
+    ZoneBtn.ZIndex = 13
+
+    ZoneBtn.MouseButton1Click:Connect(function()
+        isZoneActive = not isZoneActive
+        ClickZoneBox.Visible = isZoneActive
+        ZoneBtn.Text = isZoneActive and "Hiển Thị" or "Ẩn"
+        ZoneBtn.BackgroundColor3 = isZoneActive and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(149, 165, 166)
+        saveSettings(Main, ClickZoneBox, Tgl)
+    end)
+
+    local SizeRow, SizeLabel = CreateRow("Kích Thước Menu:", 190, SetMainContent)
+    SizeRow.ZIndex = 12 SizeLabel.ZIndex = 12
+    local SizeBtn = CreateBtn(sizeNames[currentSizeIdx], Color3.fromRGB(52, 152, 219), UDim2.new(1, -95, 0, 4), 85, 27, SizeRow)
+    SizeBtn.ZIndex = 13
+
+    SizeBtn.MouseButton1Click:Connect(function()
+        currentSizeIdx = currentSizeIdx + 1
+        if currentSizeIdx > #sizes then currentSizeIdx = 1 end
+        Main.Size = sizes[currentSizeIdx].Size
+        SizeBtn.Text = sizeNames[currentSizeIdx]
+        saveSettings(Main, ClickZoneBox, Tgl)
+    end)
+
+    -- Mở / Đóng bảng Cài Đặt
+    SetBtn.MouseButton1Click:Connect(function()
+        SetFrame.Visible = not SetFrame.Visible
+    end)
+
+    -- Đóng / Mở Menu chính khi bấm vào nút 👹
+    local mainToggled = false
+    Tgl.MouseButton1Click:Connect(function()
+        if dragT then return end
+        mainToggled = not mainToggled
+        Main.Visible = mainToggled
+        if not mainToggled then SetFrame.Visible = false end
+    end)
+end)
